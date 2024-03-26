@@ -8,10 +8,12 @@ function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [friends, setFriends] = useState([]);
-  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [wsConnected, setWsConnected] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const ws = useRef(null);
 
@@ -21,14 +23,15 @@ function App() {
       setToken(storedToken);
       checkToken(storedToken);
       loadFriends(storedToken);
+      loadUsers(storedToken);
     }
   }, []);
 
   useEffect(() => {
-    if (selectedFriend) {
-      loadMessages(username, selectedFriend);
+    if (selectedUser) {
+      loadMessages(username, selectedUser);
     }
-  }, [selectedFriend]);
+  }, [selectedUser]);
 
   const checkToken = async (token) => {
     try {
@@ -60,6 +63,7 @@ function App() {
         setLoggedIn(true);
         setUsername(username);
         loadFriends(response.data.user.Token);
+        loadUsers(response.data.user.Token);
       }
     } catch (error) {
       console.error('Login failed:', error);
@@ -86,13 +90,15 @@ function App() {
     setUsername('');
     setPassword('');
     setFriends([]);
-    setSelectedFriend(null);
+    setUsers([]);
+    setSelectedUser(null);
     setMessages([]);
     setNewMessage('');
     setWsConnected(false);
+    setSearchTerm('');
     localStorage.removeItem('token');
     if (ws.current) {
-      ws.current.close(1000, 'User logged out'); // Close the WebSocket connection with code 1000 and reason 'User logged out'
+      ws.current.close(1000, 'User logged out');
     }
   };
 
@@ -106,6 +112,19 @@ function App() {
       setFriends(response.data.users);
     } catch (error) {
       console.error('Failed to load friends:', error);
+    }
+  };
+
+  const loadUsers = async (token) => {
+    try {
+      const response = await axios.get(`${BASE_URL}/users`, {
+        headers: {
+          Authorization: token,
+        },
+      });
+      setUsers(response.data.users.filter(user => user !== username));
+    } catch (error) {
+      console.error('Failed to load users:', error);
     }
   };
 
@@ -124,7 +143,7 @@ function App() {
 
   const sendMessage = () => {
     if (!newMessage.trim()) return;
-  
+
     if (!wsConnected) {
       connectWebSocket();
       setTimeout(() => {
@@ -132,7 +151,7 @@ function App() {
           JSON.stringify({
             type: 'message',
             SenderID: username,
-            ReceipientID: selectedFriend,
+            ReceipientID: selectedUser,
             content: newMessage,
           })
         );
@@ -144,7 +163,7 @@ function App() {
         JSON.stringify({
           type: 'message',
           SenderID: username,
-          ReceipientID: selectedFriend,
+          ReceipientID: selectedUser,
           content: newMessage,
         })
       );
@@ -152,21 +171,21 @@ function App() {
       setNewMessage('');
     }
   };
-  
+
   const connectWebSocket = () => {
     ws.current = new WebSocket(`ws://localhost:8080/ws`);
-  
+
     ws.current.onopen = () => {
       setWsConnected(true);
       console.log('WebSocket connected');
     };
-  
+
     ws.current.onmessage = (event) => {
       console.log(event.data);
       const message = JSON.parse(event.data);
       setMessages((prevMessages) => [...prevMessages, message]);
     };
-  
+
     ws.current.onclose = (event) => {
       console.log('WebSocket closed:', event.code, event.reason);
       setWsConnected(false);
@@ -182,61 +201,94 @@ function App() {
     };
   };
 
+  // ... (previous code remains unchanged)
 
-  if (!token) {
-    return (
-      <div>
-        <h1>Login/Register</h1>
-        <div>
-          <input type="text" placeholder="Username" onChange={(e) => setUsername(e.target.value)} />
-          <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
-          <button onClick={() => handleLogin(username, password)}>Login</button>
-          <button onClick={() => handleRegister(username, password)}>Register</button>
-        </div>
-      </div>
-    );
-  }
+const handleSearch = (searchTerm) => {
+  setSearchTerm(searchTerm);
+};
 
-  if (!loggedIn) {
-    return <div>Validating token...</div>;
-  }
+const filteredUsers = users.filter((user) =>
+  user.toLowerCase().includes(searchTerm.toLowerCase())
+);
 
+if (!token) {
   return (
     <div>
-      <h1>Welcome, {username}!</h1>
-      <button onClick={handleLogout}>Logout</button>
-
-      <h2>Friends</h2>
-      <ul>
-        {friends.map((friend) => (
-          <li key={friend} onClick={() => setSelectedFriend(friend)}>
-            {friend}
-          </li>
-        ))}
-      </ul>
-
-      {selectedFriend && (
-        <div>
-          <h2>{selectedFriend}</h2>
-          <ul>
-            {messages.map((message, index) => (
-              <li key={index}>
-                <strong>{message.SenderID}:</strong> {message.Content}
-              </li>
-            ))}
-          </ul>
-
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-          />
-          <button onClick={sendMessage}>Send</button>
-        </div>
-      )}
+      <h1>Login/Register</h1>
+      <div>
+        <input type="text" placeholder="Username" onChange={(e) => setUsername(e.target.value)} />
+        <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+        <button onClick={() => handleLogin(username, password)}>Login</button>
+        <button onClick={() => handleRegister(username, password)}>Register</button>
+      </div>
     </div>
   );
 }
 
+if (!loggedIn) {
+  return <div>Validating token...</div>;
+}
+
+return (
+  <div>
+    <h1>Welcome, {username}!</h1>
+    <button onClick={handleLogout}>Logout</button>
+
+    <h2>Friends</h2>
+    <ul>
+      {friends.map((friend) => (
+        <li key={friend} onClick={() => setSelectedUser(friend)}>
+          {friend}
+        </li>
+      ))}
+    </ul>
+
+    <h2>Search Users</h2>
+    <input 
+      type="text" 
+      placeholder="Search users..." 
+      onChange={(e) => handleSearch(e.target.value)}
+    />
+
+    {searchTerm && (
+      <ul>
+        {filteredUsers.map((user) => (
+          <li key={user} onClick={() => setSelectedUser(user)}>
+            {user}
+          </li>
+        ))}
+      </ul>
+    )}
+
+    {selectedUser && (
+      <div>
+        <h2>{selectedUser}</h2>
+        <ul>
+          {messages.map((message, index) => (
+            <li key={index}>
+              <strong>{message.SenderID}:</strong> {message.Content}
+            </li>
+          ))}
+        </ul>
+
+        <input
+          type="text"
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          placeholder="Type a message..."
+        />
+        <button onClick={sendMessage}>Send</button>
+      </div>
+    )}
+
+    {wsConnected ? (
+      <p>WebSocket connected</p>
+    ) : (
+      <p>WebSocket disconnected</p>
+    )}
+  </div>
+);
+}
+
 export default App;
+

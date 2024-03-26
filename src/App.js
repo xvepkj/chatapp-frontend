@@ -207,9 +207,9 @@ const handleSearch = (searchTerm) => {
   setSearchTerm(searchTerm);
 };
 
-const filteredUsers = users.filter((user) =>
+const filteredUsers = users ? users.filter((user) =>
   user.toLowerCase().includes(searchTerm.toLowerCase())
-);
+) : [];
 
 if (!token) {
   return (
@@ -236,12 +236,13 @@ return (
 
     <h2>Friends</h2>
     <ul>
-      {friends.map((friend) => (
-        <li key={friend} onClick={() => setSelectedUser(friend)}>
-          {friend}
-        </li>
-      ))}
+    {friends && friends.map((friend) => (
+      <li key={friend} onClick={() => setSelectedUser(friend)}>
+        {friend}
+      </li>
+    ))}
     </ul>
+
 
     <h2>Search Users</h2>
     <input 

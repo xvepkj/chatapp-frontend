@@ -92,7 +92,7 @@ function App() {
     setWsConnected(false);
     localStorage.removeItem('token');
     if (ws.current) {
-      ws.current.close();
+      ws.current.close(1000, 'User logged out'); // Close the WebSocket connection with code 1000 and reason 'User logged out'
     }
   };
 
@@ -127,15 +127,28 @@ function App() {
   
     if (!wsConnected) {
       connectWebSocket();
+      setTimeout(() => {
+        ws.current.send(
+          JSON.stringify({
+            type: 'message',
+            SenderID: username,
+            ReceipientID: selectedFriend,
+            content: newMessage,
+          })
+        );
+        setMessages((prevMessages) => [...prevMessages, { SenderID: username, Content: newMessage }]);
+        setNewMessage('');
+      }, 1000);
     } else {
       ws.current.send(
         JSON.stringify({
           type: 'message',
-          senderID: username,
-          receiverID: selectedFriend,
-          message: newMessage,
+          SenderID: username,
+          ReceipientID: selectedFriend,
+          content: newMessage,
         })
       );
+      setMessages((prevMessages) => [...prevMessages, { SenderID: username, Content: newMessage }]);
       setNewMessage('');
     }
   };
@@ -144,28 +157,31 @@ function App() {
     ws.current = new WebSocket(`ws://localhost:8080/ws`);
   
     ws.current.onopen = () => {
-      ws.current.send(
-        JSON.stringify({
-          type: 'Authorization',
-          token: token,
-        })
-      );
       setWsConnected(true);
+      console.log('WebSocket connected');
     };
   
     ws.current.onmessage = (event) => {
+      console.log(event.data);
       const message = JSON.parse(event.data);
-      if (message.type === 'message') {
-        setMessages((prevMessages) => [...prevMessages, message]);
-      }
+      setMessages((prevMessages) => [...prevMessages, message]);
     };
   
-    ws.current.onclose = () => {
-      console.log('WebSocket closed');
+    ws.current.onclose = (event) => {
+      console.log('WebSocket closed:', event.code, event.reason);
+      setWsConnected(false);
+      // Reconnect to WebSocket if the connection is closed unintentionally
+      if (event.code !== 1000) {
+        setTimeout(connectWebSocket, 3000); // Try to reconnect after 3 seconds
+      }
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
       setWsConnected(false);
     };
   };
-  
+
 
   if (!token) {
     return (

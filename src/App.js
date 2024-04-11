@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { BASE_URL } from './apiConfig';
+import './App.css';
 
 function App() {
   const [token, setToken] = useState(null);
@@ -43,6 +44,7 @@ function App() {
       if (response.status === 200) {
         setLoggedIn(true);
         setUsername(response.data.username);
+        connectWebSocket();
       }
     } catch (error) {
       console.error('Token validation failed:', error);
@@ -64,6 +66,7 @@ function App() {
         setUsername(username);
         loadFriends(response.data.user.Token);
         loadUsers(response.data.user.Token);
+        connectWebSocket();
       }
     } catch (error) {
       console.error('Login failed:', error);
@@ -201,95 +204,99 @@ function App() {
     };
   };
 
-  // ... (previous code remains unchanged)
+  const handleSearch = (searchTerm) => {
+    setSearchTerm(searchTerm);
+  };
 
-const handleSearch = (searchTerm) => {
-  setSearchTerm(searchTerm);
-};
+  const filteredUsers = users ? users.filter((user) =>
+    user.toLowerCase().includes(searchTerm.toLowerCase())
+  ) : [];
 
-const filteredUsers = users ? users.filter((user) =>
-  user.toLowerCase().includes(searchTerm.toLowerCase())
-) : [];
+  if (!token) {
+    return (
+      <div className="container">
+        <h1>Login/Register</h1>
+        <div className="form">
+          <input type="text" placeholder="Username" onChange={(e) => setUsername(e.target.value)} />
+          <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+          <button className="btn" onClick={() => handleLogin(username, password)}>Login</button>
+          <button className="btn" onClick={() => handleRegister(username, password)}>Register</button>
+        </div>
+      </div>
+    );
+  }
 
-if (!token) {
+  if (!loggedIn) {
+    return <div className="container">Validating token...</div>;
+  }
+
   return (
-    <div>
-      <h1>Login/Register</h1>
-      <div>
-        <input type="text" placeholder="Username" onChange={(e) => setUsername(e.target.value)} />
-        <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
-        <button onClick={() => handleLogin(username, password)}>Login</button>
-        <button onClick={() => handleRegister(username, password)}>Register</button>
+    <div className="container">
+      <h1>Welcome, {username}!</h1>
+      <button className="btn" onClick={handleLogout}>Logout</button>
+
+      <div className="chat-container">
+        <div className="friends-list">
+          <h2>Friends</h2>
+          <ul>
+            {friends && friends.map((friend) => (
+              <li key={friend} onClick={() => setSelectedUser(friend)}>
+                {friend}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="search-users">
+          <h2>Search Users</h2>
+          <input 
+            type="text" 
+            placeholder="Search users..." 
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+
+          {searchTerm && (
+            <ul>
+              {filteredUsers.map((user) => (
+                <li key={user} onClick={() => setSelectedUser(user)}>
+                  {user}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {selectedUser && (
+          <div className="chat-box">
+            <h2>{selectedUser}</h2>
+            <ul className="messages">
+              {messages.map((message, index) => (
+                <li key={index}>
+                  <strong>{message.SenderID}:</strong> {message.Content}
+                </li>
+              ))}
+            </ul>
+
+            <div className="message-input">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+              />
+              <button className="btn" onClick={sendMessage}>Send</button>
+            </div>
+          </div>
+        )}
+
+        {wsConnected ? (
+          <p className="status">WebSocket connected</p>
+        ) : (
+          <p className="status">WebSocket disconnected</p>
+        )}
       </div>
     </div>
   );
 }
 
-if (!loggedIn) {
-  return <div>Validating token...</div>;
-}
-
-return (
-  <div>
-    <h1>Welcome, {username}!</h1>
-    <button onClick={handleLogout}>Logout</button>
-
-    <h2>Friends</h2>
-    <ul>
-    {friends && friends.map((friend) => (
-      <li key={friend} onClick={() => setSelectedUser(friend)}>
-        {friend}
-      </li>
-    ))}
-    </ul>
-
-
-    <h2>Search Users</h2>
-    <input 
-      type="text" 
-      placeholder="Search users..." 
-      onChange={(e) => handleSearch(e.target.value)}
-    />
-
-    {searchTerm && (
-      <ul>
-        {filteredUsers.map((user) => (
-          <li key={user} onClick={() => setSelectedUser(user)}>
-            {user}
-          </li>
-        ))}
-      </ul>
-    )}
-
-    {selectedUser && (
-      <div>
-        <h2>{selectedUser}</h2>
-        <ul>
-          {messages.map((message, index) => (
-            <li key={index}>
-              <strong>{message.SenderID}:</strong> {message.Content}
-            </li>
-          ))}
-        </ul>
-
-        <input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Type a message..."
-        />
-        <button onClick={sendMessage}>Send</button>
-      </div>
-    )}
-
-    {wsConnected ? (
-      <p>WebSocket connected</p>
-    ) : (
-      <p>WebSocket disconnected</p>
-    )}
-  </div>
-);
-}
-
 export default App;
-
